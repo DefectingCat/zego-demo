@@ -10,6 +10,7 @@ import {
   ZegoLocalStreamConfig,
   ZegoWebPlayOption,
 } from 'zego-express-engine-webrtc/sdk/code/zh/ZegoExpressEntity.web';
+import Draggable from 'react-draggable';
 
 const appID = 1237665297;
 const server = 'wss://webliveroom1237665297-api.imzego.com/ws';
@@ -272,6 +273,7 @@ const Server = () => {
         return false;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemRequireStatus]);
 
   return (
@@ -357,9 +359,15 @@ const Server = () => {
         </div>
       </div>
 
-      <div>
-        <video ref={publishVideoRef} autoPlay></video>
-      </div>
+      <Draggable>
+        <div className="cursor-move fixed z-10">
+          <video
+            className="rounded-lg w-[640px] h-[480px]"
+            ref={publishVideoRef}
+            autoPlay
+          ></video>
+        </div>
+      </Draggable>
 
       <div>
         <video ref={playVideoRef} autoPlay></video>
