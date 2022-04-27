@@ -2,8 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 
 const Home = lazy(() => import('pages/Home'));
-const Server = lazy(() => import('pages/Server/Server'));
-const Client = lazy(() => import('pages/Client/Client'));
+const Server = lazy(() => import('pages/Video/Video'));
 
 const Video = lazy(() => import('layouts/Video'));
 
@@ -40,7 +39,7 @@ function App() {
             path="client"
             element={
               <Suspense fallback>
-                <Client />
+                <Server type="client" />
               </Suspense>
             }
           />

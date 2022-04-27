@@ -22,7 +22,11 @@ const deviceValid: {
   microphone: '麦克风',
 };
 
-const Server = () => {
+type Props = {
+  type?: 'server' | 'client';
+};
+
+const Server = ({ type = 'server' }: Props) => {
   // 房间信息
   const [roomState, setRoomState] = useImmer({
     roomId: '',
@@ -30,17 +34,31 @@ const Server = () => {
     userName: '',
     token: '',
   });
+  const validType = useMemo(
+    () => ({
+      server: () =>
+        setRoomState((d) => {
+          d.userId = 'xfy';
+          d.roomId = '1';
+          d.userName = 'xfy';
+          d.token =
+            '03AAAAAGJqMZcAEGQwbnBzcnVpNXMwZjJhaDQAoNQlcGaA6GvqwLQgXcXgAknbw1OF6TulvinIFtBPwwy8O7wGnY+pgtwJV8klk/kEpisQzwmebfjQ51jWzSp83h2NEpNMyDkOFP4tset8aO2qXHSZqrZ8lBFOZ9fiXAi2/Ggrp0kzZJpllX5v65/TaQYUmvX5UX+JC3IzXGBAJz+dFCLxg5pHLaIaQ/dEbDGvoiP5zjVw1k+4oOstL18W9MY=';
+        }),
+      client: () =>
+        setRoomState((d) => {
+          d.userId = 'dfy';
+          d.roomId = '1';
+          d.userName = 'dfy';
+          d.token =
+            '03AAAAAGJqWF4AEGtwajVkZm5pdHRuYXY0aHMAoLhy/CdoodmPqX65t8+X4LAP181vTilQYngT4iTPNIkdnLA2fSQG7vpCzE5x6UtaAX+ctp7tVtMRSFps9wZ7aDcB+oC2Fa/6i12sVw86sL/NFjliP4uBywBt9oewVDx6gGEsSOrU8IBUud9XclizphdKMdGN2WYB5LW6hV+9KNR0EYh7DR/ksU+n5Uc9l9nIyw8Wt0qlSzziL0FqryxUNVQ=';
+        }),
+    }),
+    [setRoomState]
+  );
   // 模拟销售人员
   useEffect(() => {
-    setRoomState((d) => {
-      d.userId = 'xfy';
-      d.roomId = '1';
-      d.userName = 'xfy';
-      d.token =
-        '03AAAAAGJqMZcAEGQwbnBzcnVpNXMwZjJhaDQAoNQlcGaA6GvqwLQgXcXgAknbw1OF6TulvinIFtBPwwy8O7wGnY+pgtwJV8klk/kEpisQzwmebfjQ51jWzSp83h2NEpNMyDkOFP4tset8aO2qXHSZqrZ8lBFOZ9fiXAi2/Ggrp0kzZJpllX5v65/TaQYUmvX5UX+JC3IzXGBAJz+dFCLxg5pHLaIaQ/dEbDGvoiP5zjVw1k+4oOstL18W9MY=';
-
-      // loginRoom(d.roomId, d.userId,d.userName, d.token);
-    });
+    validType[type]();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setRoomState]);
   // 登录到房间
   useEffect(() => {
@@ -60,9 +78,9 @@ const Server = () => {
   const [connectStatus, setConnectStatus] = useState('DISCONNECTED');
   const connectStatusValid = useMemo(
     () => ({
-      DISCONNECTED: setConnectStatus('DISCONNECTED'),
-      CONNECTING: setConnectStatus('CONNECTING'),
-      CONNECTED: setConnectStatus('CONNECTED'),
+      DISCONNECTED: () => setConnectStatus('DISCONNECTED'),
+      CONNECTING: () => setConnectStatus('CONNECTING'),
+      CONNECTED: () => setConnectStatus('CONNECTED'),
     }),
     []
   );
@@ -81,9 +99,8 @@ const Server = () => {
   );
 
   // Init engine event
-  zg.current.on(
-    'roomStateUpdate',
-    (roomID, state) => connectStatusValid[state]
+  zg.current.on('roomStateUpdate', (roomID, state) =>
+    connectStatusValid[state]()
   );
   zg.current.on('publisherStateUpdate', ({ state, streamID }) =>
     publishInfoStreamIDValid[state](streamID)
@@ -220,25 +237,14 @@ const Server = () => {
   const remoteStream = useRef<MediaStream | null>(null);
   // 远端摄像头 video ref
   const playVideoRef = useRef<HTMLVideoElement>(null);
-  async function playStream(streamID: string, options: ZegoWebPlayOption = {}) {
-    try {
-      const stream = await zg.current.startPlayingStream(streamID, options);
-      remoteStream.current = stream;
-      if (!playVideoRef.current) throw new Error('playVideoRef is null');
-      playVideoRef.current.srcObject = remoteStream.current;
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
 
-  // Handlers
+  // 设备权限状态
   const [systemRequireStatus, setSystemRequireStatus] = useState(false);
   const handleVideo = async () => {
     setSystemRequireStatus(await checkSystemRequirements());
   };
   useEffect(() => {
-    systemRequireStatus &&
+    if (systemRequireStatus) {
       publishStream(publishInfoStreamID, {
         camera: {
           audioInput: device.microphoneDevicesVal,
@@ -247,6 +253,11 @@ const Server = () => {
           audio: deviceStatus.microphone,
         },
       });
+      playStream(publishInfoStreamID, {
+        video: deviceStatus.camera,
+        audio: deviceStatus.microphone,
+      });
+    }
 
     async function publishStream(
       streamID: string,
@@ -268,6 +279,21 @@ const Server = () => {
           throw new Error('publishVideoRef is null');
         publishVideoRef.current.srcObject = localStream.current;
 
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function playStream(
+      streamID: string,
+      options: ZegoWebPlayOption = {}
+    ) {
+      try {
+        const stream = await zg.current.startPlayingStream(streamID, options);
+        remoteStream.current = stream;
+        if (!playVideoRef.current) throw new Error('playVideoRef is null');
+        playVideoRef.current.srcObject = remoteStream.current;
         return true;
       } catch (e) {
         return false;
@@ -359,6 +385,7 @@ const Server = () => {
         </div>
       </div>
 
+      {/* 推流 */}
       <Draggable>
         <div className="cursor-move fixed z-10">
           <video
@@ -369,9 +396,16 @@ const Server = () => {
         </div>
       </Draggable>
 
-      <div>
-        <video ref={playVideoRef} autoPlay></video>
-      </div>
+      {/* 拉流 */}
+      <Draggable>
+        <div className="cursor-move fixed z-10">
+          <video
+            className="rounded-lg w-[640px] h-[480px]"
+            ref={playVideoRef}
+            autoPlay
+          ></video>
+        </div>
+      </Draggable>
     </>
   );
 };
