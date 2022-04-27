@@ -3,7 +3,8 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import { HashRouter } from "react-router-dom";
+import { HashRouter } from 'react-router-dom';
+import { NextUIProvider } from '@nextui-org/react';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -11,8 +12,9 @@ const root = ReactDOM.createRoot(
 root.render(
   <React.StrictMode>
     <HashRouter>
-    <App />
-
+      <NextUIProvider>
+        <App />
+      </NextUIProvider>
     </HashRouter>
   </React.StrictMode>
 );
