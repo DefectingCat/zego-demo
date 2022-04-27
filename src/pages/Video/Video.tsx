@@ -85,7 +85,10 @@ const Server = ({ type = 'server' }: Props) => {
     []
   );
   // 流 ID
-  const [publishInfoStreamID, setPublishInfoStreamID] = useState('0001');
+  const [publishInfoStreamID, setPublishInfoStreamID] = useState('');
+  useEffect(() => {
+    setPublishInfoStreamID(`${roomState.roomId}-${roomState.userId}`);
+  }, [roomState]);
   const publishInfoStreamIDValid = useMemo(
     () => ({
       PUBLISHING: (streamID: string) => setPublishInfoStreamID(streamID),
@@ -99,15 +102,25 @@ const Server = ({ type = 'server' }: Props) => {
   );
 
   // Init engine event
-  zg.current.on('roomStateUpdate', (roomID, state) =>
-    connectStatusValid[state]()
-  );
+  zg.current.on('roomStateUpdate', (roomID, state) => {
+    connectStatusValid[state]();
+  });
   zg.current.on('publisherStateUpdate', ({ state, streamID }) =>
     publishInfoStreamIDValid[state](streamID)
   );
-  zg.current.on('playerStateUpdate', ({ state, streamID }) =>
-    publishInfoStreamIDValid[state](streamID)
-  );
+  zg.current.on('playerStateUpdate', ({ state, streamID }) => {
+    publishInfoStreamIDValid[state](streamID);
+  });
+  zg.current.on('roomStreamUpdate', (roomID, updateType, steamList) => {
+    console.error('roomStreamUpdate', roomID, updateType, steamList);
+    if (updateType === 'ADD') {
+      if (systemRequireStatus)
+        playStream(steamList[0].streamID, {
+          video: deviceStatus.camera,
+          audio: deviceStatus.microphone,
+        });
+    }
+  });
 
   // Step 2: Check system requirements
   // 设备权限状态
@@ -237,6 +250,17 @@ const Server = ({ type = 'server' }: Props) => {
   const remoteStream = useRef<MediaStream | null>(null);
   // 远端摄像头 video ref
   const playVideoRef = useRef<HTMLVideoElement>(null);
+  async function playStream(streamID: string, options: ZegoWebPlayOption = {}) {
+    try {
+      const stream = await zg.current.startPlayingStream(streamID, options);
+      remoteStream.current = stream;
+      if (!playVideoRef.current) throw new Error('playVideoRef is null');
+      playVideoRef.current.srcObject = remoteStream.current;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 
   // 设备权限状态
   const [systemRequireStatus, setSystemRequireStatus] = useState(false);
@@ -252,10 +276,6 @@ const Server = ({ type = 'server' }: Props) => {
           video: deviceStatus.camera,
           audio: deviceStatus.microphone,
         },
-      });
-      playStream(publishInfoStreamID, {
-        video: deviceStatus.camera,
-        audio: deviceStatus.microphone,
       });
     }
 
@@ -285,20 +305,6 @@ const Server = ({ type = 'server' }: Props) => {
       }
     }
 
-    async function playStream(
-      streamID: string,
-      options: ZegoWebPlayOption = {}
-    ) {
-      try {
-        const stream = await zg.current.startPlayingStream(streamID, options);
-        remoteStream.current = stream;
-        if (!playVideoRef.current) throw new Error('playVideoRef is null');
-        playVideoRef.current.srcObject = remoteStream.current;
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [systemRequireStatus]);
 
