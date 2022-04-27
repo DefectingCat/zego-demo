@@ -3,10 +3,17 @@ import cn from 'classnames';
 import { useMemo, useState } from 'react';
 import { ReactComponent as MicroPhone } from 'assets/video/microphone.svg';
 import { ReactComponent as Camera } from 'assets/video/camera.svg';
-import { Button } from '@nextui-org/react';
+import { Button, Popover } from '@nextui-org/react';
 
 const appID = 1237665297;
 const server = 'wss://webliveroom1237665297-api.imzego.com/ws';
+
+const deviceValid: {
+  [key: string]: string;
+} = {
+  camera: '摄像机',
+  microphone: '麦克风',
+};
 
 const Server = () => {
   // 连接状态
@@ -35,7 +42,11 @@ const Server = () => {
   );
 
   // 设备权限状态
-  const [deviceStatus, setDeviceStatus] = useState({
+  const [deviceStatus, setDeviceStatus] = useState<{
+    [key: string]: boolean;
+    camera: boolean;
+    microphone: boolean;
+  }>({
     camera: false,
     microphone: false,
   });
@@ -127,7 +138,32 @@ const Server = () => {
         <div className="h-[1px] bg-gray-300"></div>
         {/* 聊天工具栏 */}
         <div className="p-4 flex items-center">
-          <Camera className="mr-4 cursor-pointer" onClick={handleVideo} />
+          <Popover placement="top">
+            <Popover.Trigger>
+              <Camera className="mr-4 cursor-pointer" onClick={handleVideo} />
+            </Popover.Trigger>
+            <Popover.Content>
+              <div className="p-4">
+                {Object.keys(deviceStatus).map((k) => (
+                  <div id={k} className="flex">
+                    {deviceValid[k]}：
+                    {deviceStatus[k] ? (
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-green-600 mr-1"></div>
+                        <div>权限正常</div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 rounded-full bg-red-600 mr-1"></div>
+                        <div>无法读取{deviceValid[k]}</div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Popover.Content>
+          </Popover>
+
           <MicroPhone className=" cursor-pointer" />
         </div>
 
