@@ -91,7 +91,7 @@ const Server = ({ type = 'server' }: Props) => {
     setPublishInfoStreamID(roomState.userId);
   }, [roomState]);
   // 拉流 ID
-  const [playInfoStreamID, setPlayInfoStreamID] = useState('');
+  const [playInfoStreamID, setPlayInfoStreamID] = useState<string | null>(null);
   const publishInfoStreamIDValid = useMemo(
     () => ({
       PUBLISHING: (streamID: string) => setPublishInfoStreamID(streamID),
@@ -120,12 +120,9 @@ const Server = ({ type = 'server' }: Props) => {
     publishInfoStreamIDValid[state](streamID)
   );
   zg.current.on('playerStateUpdate', ({ state, streamID }) => {
-    console.error('playerStateUpdate', streamID);
-
     publishInfoStreamIDValid[state](streamID);
   });
   zg.current.on('roomStreamUpdate', (roomID, updateType, steamList) => {
-    console.error('roomStreamUpdate', roomID, updateType, steamList);
     if (updateType === 'ADD') {
       setPlayInfoStreamID(steamList[0].streamID);
     }
@@ -296,6 +293,7 @@ const Server = ({ type = 'server' }: Props) => {
       playVideoRef.current.srcObject = remoteStream.current;
       return true;
     } catch (e) {
+      console.error(e);
       return false;
     }
   }
@@ -319,7 +317,8 @@ const Server = ({ type = 'server' }: Props) => {
 
   // 执行推流
   useEffect(() => {
-    if (systemRequireStatus) {
+    if (!systemRequireStatus) return;
+    if (!isPublishing) {
       publishStream(publishInfoStreamID, {
         camera: {
           audioInput: device.microphoneDevicesVal,
@@ -328,6 +327,8 @@ const Server = ({ type = 'server' }: Props) => {
           audio: deviceStatus.microphone,
         },
       });
+    }
+    if (playInfoStreamID) {
       playStream(playInfoStreamID, {
         video: deviceStatus.camera,
         audio: deviceStatus.microphone,
@@ -335,7 +336,7 @@ const Server = ({ type = 'server' }: Props) => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemRequireStatus, playInfoStreamID]);
+  }, [systemRequireStatus, isPublishing, playInfoStreamID]);
 
   return (
     <>
