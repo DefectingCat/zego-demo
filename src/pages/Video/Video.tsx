@@ -364,19 +364,17 @@ const Server = ({ type = 'server' }: Props) => {
   ]);
 
   const hangUp = () => {
-    if (publishStatus === 'PUBLISHING') {
-      localStream && zg.current.destroyStream(localStream);
-      localStream = null;
-      zg.current.stopPublishingStream(publishInfoStreamID);
-      setIsPublishingStream(false);
-    }
-    if (playStatus === 'PLAYING' && playInfoStreamID) {
-      remoteStream && zg.current.destroyStream(remoteStream);
-      remoteStream = null;
-      zg.current.stopPlayingStream(playInfoStreamID);
-      setPlayInfoStreamID('');
-      setIsPlayingStream(false);
-    }
+    localStream && zg.current.destroyStream(localStream);
+    localStream = null;
+    zg.current.stopPublishingStream(publishInfoStreamID);
+    setIsPublishingStream(false);
+    if (publishVideoRef.current) publishVideoRef.current.srcObject = null;
+    remoteStream && zg.current.destroyStream(remoteStream);
+    remoteStream = null;
+    zg.current.stopPlayingStream(playInfoStreamID ?? '');
+    setPlayInfoStreamID('');
+    setIsPlayingStream(false);
+    if (playVideoRef.current) playVideoRef.current.srcObject = null;
     setShowVideo(false);
   };
 
