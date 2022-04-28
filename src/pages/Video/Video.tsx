@@ -84,11 +84,14 @@ const Server = ({ type = 'server' }: Props) => {
     }),
     []
   );
-  // 流 ID
+
+  // 推流 ID
   const [publishInfoStreamID, setPublishInfoStreamID] = useState('');
   useEffect(() => {
-    setPublishInfoStreamID(`${roomState.roomId}-${roomState.userId}`);
+    setPublishInfoStreamID(roomState.userId);
   }, [roomState]);
+  // 拉流 ID
+  const [playInfoStreamID, setPlayInfoStreamID] = useState('');
   const publishInfoStreamIDValid = useMemo(
     () => ({
       PUBLISHING: (streamID: string) => setPublishInfoStreamID(streamID),
@@ -109,7 +112,6 @@ const Server = ({ type = 'server' }: Props) => {
   });
   // 监听对方进入房间
   zg.current.on('roomUserUpdate', (roomID, updateType, userList) => {
-    console.error(roomID, updateType, userList);
     if (updateType === 'ADD') {
       setIsOnline(true);
     }
@@ -118,16 +120,14 @@ const Server = ({ type = 'server' }: Props) => {
     publishInfoStreamIDValid[state](streamID)
   );
   zg.current.on('playerStateUpdate', ({ state, streamID }) => {
+    console.error('playerStateUpdate', streamID);
+
     publishInfoStreamIDValid[state](streamID);
   });
   zg.current.on('roomStreamUpdate', (roomID, updateType, steamList) => {
     console.error('roomStreamUpdate', roomID, updateType, steamList);
     if (updateType === 'ADD') {
-      if (systemRequireStatus)
-        playStream(steamList[0].streamID, {
-          video: deviceStatus.camera,
-          audio: deviceStatus.microphone,
-        });
+      setPlayInfoStreamID(steamList[0].streamID);
     }
   });
 
@@ -316,6 +316,8 @@ const Server = ({ type = 'server' }: Props) => {
 
     setLoading(false);
   };
+
+  // 执行推流
   useEffect(() => {
     if (systemRequireStatus) {
       publishStream(publishInfoStreamID, {
@@ -326,10 +328,14 @@ const Server = ({ type = 'server' }: Props) => {
           audio: deviceStatus.microphone,
         },
       });
+      playStream(playInfoStreamID, {
+        video: deviceStatus.camera,
+        audio: deviceStatus.microphone,
+      });
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemRequireStatus, publishStream]);
+  }, [systemRequireStatus, playInfoStreamID]);
 
   return (
     <>
@@ -401,7 +407,6 @@ const Server = ({ type = 'server' }: Props) => {
         </div>
       </div>
 
-      {/* 推流 */}
       {showVideo && (
         <Draggable>
           <div
@@ -411,14 +416,26 @@ const Server = ({ type = 'server' }: Props) => {
               'bg-white rounded-lg shadow-lg'
             )}
           >
+            {/* 拉流 对方的视频流 */}
             <video
               className={cn(
                 'rounded-lg w-[640px] h-[480px]',
                 isPublishing || 'hidden'
               )}
+              ref={playVideoRef}
+              autoPlay
+            ></video>
+            {/* 推流 本机的视频流 */}
+            <video
+              className={cn(
+                'rounded-lg w-[240px] h-[180px]',
+                isPublishing || 'hidden',
+                'absolute right-4 bottom-4'
+              )}
               ref={publishVideoRef}
               autoPlay
             ></video>
+
             <div className={cn(isPublishing && 'hidden')}>
               {loading ? (
                 <div>检测设备中</div>
@@ -444,17 +461,6 @@ const Server = ({ type = 'server' }: Props) => {
           </div>
         </Draggable>
       )}
-
-      {/* 拉流 */}
-      {/* <Draggable>
-        <div className="fixed z-10 cursor-move">
-          <video
-            className="rounded-lg w-[640px] h-[480px]"
-            ref={playVideoRef}
-            autoPlay
-          ></video>
-        </div>
-      </Draggable> */}
     </>
   );
 };
