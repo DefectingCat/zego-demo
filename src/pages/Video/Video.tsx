@@ -42,7 +42,7 @@ const Server = ({ type = 'server' }: Props) => {
           d.roomId = '1';
           d.userName = 'xfy';
           d.token =
-            '03AAAAAGJqMZcAEGQwbnBzcnVpNXMwZjJhaDQAoNQlcGaA6GvqwLQgXcXgAknbw1OF6TulvinIFtBPwwy8O7wGnY+pgtwJV8klk/kEpisQzwmebfjQ51jWzSp83h2NEpNMyDkOFP4tset8aO2qXHSZqrZ8lBFOZ9fiXAi2/Ggrp0kzZJpllX5v65/TaQYUmvX5UX+JC3IzXGBAJz+dFCLxg5pHLaIaQ/dEbDGvoiP5zjVw1k+4oOstL18W9MY=';
+            '03AAAAAGJrO6wAEHljZHgxeXJ3d3lrYmZjd3gAoJjRaV0PaIoV2+npM7KYH9N7y7ylSvza6HqgUIwJi8QrrLcYHrY0K2tluKO7r+scGMo08Iewy8Y6cTLd1tkn0w3Gyt4gZFx/VGLJXMzuZFrsWvbGdOb2xF6GbZ+HRbmxkBX4At+TftRBq8GduzF8wKz4zck/lyC1AbQlYjLOICWkgF9ef5P0rf4SLSunA6sewYBAFRDJ/ufdfjXy+nsCDFE=';
         }),
       client: () =>
         setRoomState((d) => {
@@ -50,7 +50,7 @@ const Server = ({ type = 'server' }: Props) => {
           d.roomId = '1';
           d.userName = 'dfy';
           d.token =
-            '03AAAAAGJqWF4AEGtwajVkZm5pdHRuYXY0aHMAoLhy/CdoodmPqX65t8+X4LAP181vTilQYngT4iTPNIkdnLA2fSQG7vpCzE5x6UtaAX+ctp7tVtMRSFps9wZ7aDcB+oC2Fa/6i12sVw86sL/NFjliP4uBywBt9oewVDx6gGEsSOrU8IBUud9XclizphdKMdGN2WYB5LW6hV+9KNR0EYh7DR/ksU+n5Uc9l9nIyw8Wt0qlSzziL0FqryxUNVQ=';
+            '03AAAAAGJrO7kAEDNrYWYzMWtvZmVncnFueXMAoJ/9+IEWf2b1tTql/14fF2IIVZbGaf7rXsvkyKqcGklexKZcFpckAljXQjn9BLDcHu1oDEP18hOwExMW7pU2UNhhnmOZQ3ec7elDvjmX7NyMOIjFTRTV1bhzZtKXrYNw4DMrqARAmMLIB1L1H3N/dHLBPTeNeVou1jk7LEDvtwgiU4j2MHjPKWuwgx5gn3gRdNzxblKFro1PgGgYUK2FXj0=';
         }),
     }),
     [setRoomState]
@@ -101,9 +101,18 @@ const Server = ({ type = 'server' }: Props) => {
     []
   );
 
+  // 对方是否在线
+  const [isOnline, setIsOnline] = useState(false);
   // Init engine event
   zg.current.on('roomStateUpdate', (roomID, state) => {
     connectStatusValid[state]();
+  });
+  // 监听对方进入房间
+  zg.current.on('roomUserUpdate', (roomID, updateType, userList) => {
+    console.error(roomID, updateType, userList);
+    if (updateType === 'ADD') {
+      setIsOnline(true);
+    }
   });
   zg.current.on('publisherStateUpdate', ({ state, streamID }) =>
     publishInfoStreamIDValid[state](streamID)
@@ -213,8 +222,6 @@ const Server = ({ type = 'server' }: Props) => {
     });
   }
 
-  // 是否登录
-  const [isLogin, setIsLogin] = useState(false);
   // Step 3: login to room
   async function loginRoom(
     roomId: string,
@@ -223,13 +230,16 @@ const Server = ({ type = 'server' }: Props) => {
     token: string
   ) {
     try {
-      await zg.current.loginRoom(roomId, token, {
-        userID: userId,
-        userName,
-      });
-      setIsLogin(true);
+      await zg.current.loginRoom(
+        roomId,
+        token,
+        {
+          userID: userId,
+          userName,
+        },
+        { userUpdate: true }
+      );
     } catch (e) {
-      setIsLogin(false);
       console.error(e);
     }
   }
@@ -318,15 +328,15 @@ const Server = ({ type = 'server' }: Props) => {
         )}
       >
         {/* 标头 */}
-        <div className="py-4 flex justify-between">
+        <div className="flex justify-between py-4">
           <div className="flex items-center">
-            <span className="text-2xl font-medium mr-2">
+            <span className="mr-2 text-2xl font-medium">
               云汇展在线工作人员
             </span>
             <span
               className={cn(
                 'w-4 h-4 rounded-full',
-                isLogin ? 'bg-green-600' : 'bg-red-600'
+                isOnline ? 'bg-green-600' : 'bg-red-600'
               )}
             ></span>
           </div>
@@ -348,7 +358,7 @@ const Server = ({ type = 'server' }: Props) => {
 
         <div className="h-[1px] bg-gray-300"></div>
         {/* 聊天工具栏 */}
-        <div className="p-4 flex items-center">
+        <div className="flex items-center p-4">
           <Popover placement="top">
             <Popover.Trigger>
               <Camera className="mr-4 cursor-pointer" onClick={handleVideo} />
@@ -360,12 +370,12 @@ const Server = ({ type = 'server' }: Props) => {
                     {deviceValid[k]}：
                     {deviceStatus[k] ? (
                       <div className="flex items-center">
-                        <div className="w-3 h-3 rounded-full bg-green-600 mr-1"></div>
+                        <div className="w-3 h-3 mr-1 bg-green-600 rounded-full"></div>
                         <div>权限正常</div>
                       </div>
                     ) : (
                       <div className="flex items-center">
-                        <div className="w-3 h-3 rounded-full bg-red-600 mr-1"></div>
+                        <div className="w-3 h-3 mr-1 bg-red-600 rounded-full"></div>
                         <div>无法读取{deviceValid[k]}</div>
                       </div>
                     )}
@@ -375,7 +385,7 @@ const Server = ({ type = 'server' }: Props) => {
             </Popover.Content>
           </Popover>
 
-          <MicroPhone className=" cursor-pointer" />
+          <MicroPhone className="cursor-pointer " />
         </div>
 
         {/* 聊天内容输入框 */}
@@ -383,7 +393,7 @@ const Server = ({ type = 'server' }: Props) => {
           <textarea
             name=""
             id=""
-            className="resize-none w-full h-full"
+            className="w-full h-full resize-none"
           ></textarea>
         </div>
         <div className="flex justify-end">
@@ -393,7 +403,7 @@ const Server = ({ type = 'server' }: Props) => {
 
       {/* 推流 */}
       <Draggable>
-        <div className="cursor-move fixed z-10">
+        <div className="fixed z-10 cursor-move">
           <video
             className="rounded-lg w-[640px] h-[480px]"
             ref={publishVideoRef}
@@ -404,7 +414,7 @@ const Server = ({ type = 'server' }: Props) => {
 
       {/* 拉流 */}
       <Draggable>
-        <div className="cursor-move fixed z-10">
+        <div className="fixed z-10 cursor-move">
           <video
             className="rounded-lg w-[640px] h-[480px]"
             ref={playVideoRef}
