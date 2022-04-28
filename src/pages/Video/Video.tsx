@@ -253,6 +253,34 @@ const Server = ({ type = 'server' }: Props) => {
   const localStream = useRef<MediaStream | null>(null);
   // 本机摄像头 video ref
   const publishVideoRef = useRef<HTMLVideoElement>(null);
+  // 是否已经开始推流
+  const [isPublishing, setIsPublishing] = useState(false);
+  async function publishStream(
+    streamID: string,
+    config: ZegoLocalStreamConfig
+  ) {
+    try {
+      const stream = await zg.current.createStream(config);
+      localStream.current = stream;
+
+      zg.current.startPublishingStream(
+        streamID,
+        localStream.current ?? stream,
+        {
+          videoCodec,
+        }
+      );
+
+      if (!publishVideoRef.current) throw new Error('publishVideoRef is null');
+      publishVideoRef.current.srcObject = localStream.current;
+      setIsPublishing(true);
+
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  }
 
   // 流
   // Step 5: play stream
@@ -274,8 +302,19 @@ const Server = ({ type = 'server' }: Props) => {
 
   // 设备权限状态
   const [systemRequireStatus, setSystemRequireStatus] = useState(false);
+  // 是否显示 video 标签
+  const [showVideo, setShowVideo] = useState(false);
+  // 设备权限检测时加载状态
+  const [loading, setLoading] = useState(false);
+
   const handleVideo = async () => {
-    setSystemRequireStatus(await checkSystemRequirements());
+    if (!isOnline) return;
+    setLoading(true);
+    setShowVideo(true);
+    const result = await checkSystemRequirements();
+    setSystemRequireStatus(result);
+
+    setLoading(false);
   };
   useEffect(() => {
     if (systemRequireStatus) {
@@ -289,34 +328,8 @@ const Server = ({ type = 'server' }: Props) => {
       });
     }
 
-    async function publishStream(
-      streamID: string,
-      config: ZegoLocalStreamConfig
-    ) {
-      try {
-        const stream = await zg.current.createStream(config);
-        localStream.current = stream;
-
-        zg.current.startPublishingStream(
-          streamID,
-          localStream.current ?? stream,
-          {
-            videoCodec,
-          }
-        );
-
-        if (!publishVideoRef.current)
-          throw new Error('publishVideoRef is null');
-        publishVideoRef.current.srcObject = localStream.current;
-
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemRequireStatus]);
+  }, [systemRequireStatus, publishStream]);
 
   return (
     <>
@@ -363,26 +376,13 @@ const Server = ({ type = 'server' }: Props) => {
             <Popover.Trigger>
               <Camera className="mr-4 cursor-pointer" onClick={handleVideo} />
             </Popover.Trigger>
-            <Popover.Content>
-              <div className="p-4">
-                {Object.keys(deviceStatus).map((k) => (
-                  <div key={k} className="flex">
-                    {deviceValid[k]}：
-                    {deviceStatus[k] ? (
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 mr-1 bg-green-600 rounded-full"></div>
-                        <div>权限正常</div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 mr-1 bg-red-600 rounded-full"></div>
-                        <div>无法读取{deviceValid[k]}</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Popover.Content>
+            {isOnline ? (
+              <></>
+            ) : (
+              <Popover.Content>
+                <div className="p-4">对方不在线</div>
+              </Popover.Content>
+            )}
           </Popover>
 
           <MicroPhone className="cursor-pointer " />
@@ -402,18 +402,51 @@ const Server = ({ type = 'server' }: Props) => {
       </div>
 
       {/* 推流 */}
-      <Draggable>
-        <div className="fixed z-10 cursor-move">
-          <video
-            className="rounded-lg w-[640px] h-[480px]"
-            ref={publishVideoRef}
-            autoPlay
-          ></video>
-        </div>
-      </Draggable>
+      {showVideo && (
+        <Draggable>
+          <div
+            className={cn(
+              'fixed z-10 cursor-move w-[640px] h-[480px]',
+              'flex justify-center items-center',
+              'bg-white rounded-lg shadow-lg'
+            )}
+          >
+            <video
+              className={cn(
+                'rounded-lg w-[640px] h-[480px]',
+                isPublishing || 'hidden'
+              )}
+              ref={publishVideoRef}
+              autoPlay
+            ></video>
+            <div className={cn(isPublishing && 'hidden')}>
+              {loading ? (
+                <div>检测设备中</div>
+              ) : (
+                Object.keys(deviceStatus).map((k) => (
+                  <div key={k} className="flex">
+                    {deviceValid[k]}：
+                    {deviceStatus[k] ? (
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 mr-1 bg-green-600 rounded-full"></div>
+                        <div>权限正常</div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 mr-1 bg-red-600 rounded-full"></div>
+                        <div>无法读取{deviceValid[k]}</div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </Draggable>
+      )}
 
       {/* 拉流 */}
-      <Draggable>
+      {/* <Draggable>
         <div className="fixed z-10 cursor-move">
           <video
             className="rounded-lg w-[640px] h-[480px]"
@@ -421,7 +454,7 @@ const Server = ({ type = 'server' }: Props) => {
             autoPlay
           ></video>
         </div>
-      </Draggable>
+      </Draggable> */}
     </>
   );
 };
