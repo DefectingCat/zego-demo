@@ -13,6 +13,11 @@ import {
 } from 'zego-express-engine-webrtc/sdk/code/zh/ZegoExpressEntity.web';
 import Draggable from 'react-draggable';
 
+export const isMobile: boolean =
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+
 const appID = 1237665297;
 const server = 'wss://webliveroom1237665297-api.imzego.com/ws';
 
@@ -29,6 +34,10 @@ type Props = {
 
 let localStream: MediaStream | null = null;
 let remoteStream: MediaStream | null = null;
+const resolution = {
+  width: isMobile ? 360 : 640,
+  height: isMobile ? 640 : 480,
+};
 
 const Server = ({ type = 'server' }: Props) => {
   // 房间信息
@@ -137,6 +146,7 @@ const Server = ({ type = 'server' }: Props) => {
       setPlayInfoStreamID(steamList[0].streamID);
     }
     if (updateType === 'DELETE') {
+      hangUp();
     }
   });
 
@@ -284,7 +294,7 @@ const Server = ({ type = 'server' }: Props) => {
     }
   }
 
-  // 流
+  // 拉流
   // Step 5: play stream
   // 是否开始拉流
   const [isPlayingStream, setIsPlayingStream] = useState(false);
@@ -334,6 +344,7 @@ const Server = ({ type = 'server' }: Props) => {
           videoInput: device.cameraDevicesVal,
           video: deviceStatus.camera,
           audio: deviceStatus.microphone,
+          ...resolution,
         },
       });
     }
@@ -354,10 +365,14 @@ const Server = ({ type = 'server' }: Props) => {
 
   const hangUp = () => {
     if (publishStatus === 'PUBLISHING') {
+      localStream && zg.current.destroyStream(localStream);
+      localStream = null;
       zg.current.stopPublishingStream(publishInfoStreamID);
       setIsPublishingStream(false);
     }
     if (playStatus === 'PLAYING' && playInfoStreamID) {
+      remoteStream && zg.current.destroyStream(remoteStream);
+      remoteStream = null;
       zg.current.stopPlayingStream(playInfoStreamID);
       setPlayInfoStreamID('');
       setIsPlayingStream(false);
@@ -369,9 +384,10 @@ const Server = ({ type = 'server' }: Props) => {
     <>
       <div
         className={cn(
-          'fixed top-1/2 left-1/2 rounded-lg shadow-lg',
-          'transform -translate-x-1/2 -translate-y-1/2',
-          'p-4 w-[800px]'
+          'top-0 left-0 w-full h-full',
+          'fixed md:top-1/2 md:left-1/2 rounded-md shadow-md',
+          'md:transform md:-translate-x-1/2 md:-translate-y-1/2',
+          'p-4 md:w-[800px] md:h-[unset]'
         )}
       >
         {/* 标头 */}
@@ -439,17 +455,21 @@ const Server = ({ type = 'server' }: Props) => {
         <Draggable>
           <div
             className={cn(
-              'fixed z-10 cursor-move w-[640px] h-[480px]',
+              'fixed z-10 cursor-move ',
               'flex justify-center items-center',
               'bg-white rounded-lg shadow-lg',
-              'group overflow-hidden'
+              'group overflow-hidden',
+              'w-full h-full',
+              'md:w-[640px] md:h-[480px]'
             )}
           >
             {/* 拉流 对方的视频流 */}
             <video
               className={cn(
-                'rounded-lg w-[640px] h-[480px]',
-                isPublishing || 'hidden'
+                'rounded-lg ',
+                isPublishing || 'hidden',
+                'w-full h-full',
+                'md:w-[640px] md:h-[480px]'
               )}
               ref={playVideoRef}
               autoPlay
