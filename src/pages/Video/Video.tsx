@@ -3,6 +3,7 @@ import cn from 'classnames';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ReactComponent as MicroPhone } from 'assets/video/microphone.svg';
 import { ReactComponent as Camera } from 'assets/video/camera.svg';
+import { ReactComponent as HandOff } from 'assets/video/handoff.svg';
 import { Button, Popover } from '@nextui-org/react';
 import { useImmer } from 'use-immer';
 import {
@@ -107,12 +108,15 @@ const Server = ({ type = 'server' }: Props) => {
   // 对方是否在线
   const [isOnline, setIsOnline] = useState(false);
   // Init engine event
+  zg.current.on('roomOnlineUserCountUpdate', (roomID, count) => {
+    // console.debug(count);
+  });
   zg.current.on('roomStateUpdate', (roomID, state) => {
     connectStatusValid[state]();
   });
   // 监听对方进入房间
   zg.current.on('roomUserUpdate', (roomID, updateType, userList) => {
-    if (updateType === 'ADD') {
+    if (userList.length > 0) {
       setIsOnline(true);
     }
   });
@@ -414,7 +418,8 @@ const Server = ({ type = 'server' }: Props) => {
             className={cn(
               'fixed z-10 cursor-move w-[640px] h-[480px]',
               'flex justify-center items-center',
-              'bg-white rounded-lg shadow-lg'
+              'bg-white rounded-lg shadow-lg',
+              'group overflow-hidden'
             )}
           >
             {/* 拉流 对方的视频流 */}
@@ -458,6 +463,24 @@ const Server = ({ type = 'server' }: Props) => {
                   </div>
                 ))
               )}
+            </div>
+
+            {/* 视频控制栏 */}
+            <div
+              className={cn(
+                'absolute hidden',
+                'group-hover:flex',
+                isPublishing || '!hidden',
+                'transition-all',
+                'h-[100px] w-full',
+                'items-center justify-evenly',
+                'bottom-0',
+                'bg-opacity-50 bg-gray-300'
+              )}
+            >
+              <div className="cursor-pointer">
+                <HandOff className="w-12 h-12" />
+              </div>
             </div>
           </div>
         </Draggable>
