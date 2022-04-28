@@ -161,7 +161,7 @@ const Server = ({ type = 'server' }: Props) => {
     microphone: false,
   });
   async function checkSystemRequirements() {
-    console.log('sdk version is', zg.current.getVersion());
+    console.warn('sdk version is', zg.current.getVersion());
     try {
       const result = await zg.current.checkSystemRequirements();
 
