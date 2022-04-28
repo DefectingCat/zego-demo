@@ -3,7 +3,7 @@ import cn from 'classnames';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ReactComponent as MicroPhone } from 'assets/video/microphone.svg';
 import { ReactComponent as Camera } from 'assets/video/camera.svg';
-import { ReactComponent as HandOff } from 'assets/video/handoff.svg';
+import { ReactComponent as HangUp } from 'assets/video/hangup.svg';
 import { Button, Popover } from '@nextui-org/react';
 import { useImmer } from 'use-immer';
 import {
@@ -26,6 +26,9 @@ const deviceValid: {
 type Props = {
   type?: 'server' | 'client';
 };
+
+let localStream: MediaStream | null = null;
+let remoteStream: MediaStream | null = null;
 
 const Server = ({ type = 'server' }: Props) => {
   // 房间信息
@@ -98,6 +101,7 @@ const Server = ({ type = 'server' }: Props) => {
   const [publishStatus, setPublishStatus] = useState<
     'PUBLISHING' | 'NO_PUBLISH' | 'PUBLISH_REQUESTING'
   >('NO_PUBLISH');
+  // 是否已经开始推流
   const isPublishing = useMemo(
     () => publishStatus === 'PUBLISHING',
     [publishStatus]
@@ -254,29 +258,24 @@ const Server = ({ type = 'server' }: Props) => {
   const videoCodec =
     localStorage.getItem('VideoCodec') === 'H.264' ? 'H264' : 'VP8';
 
-  // 推流信息
-  const localStream = useRef<MediaStream | null>(null);
   // 本机摄像头 video ref
   const publishVideoRef = useRef<HTMLVideoElement>(null);
-  // 是否已经开始推流
+  // 是否开始推流
+  const [isPublishingStream, setIsPublishingStream] = useState(false);
   async function publishStream(
     streamID: string,
     config: ZegoLocalStreamConfig
   ) {
     try {
       const stream = await zg.current.createStream(config);
-      localStream.current = stream;
+      localStream = stream;
 
-      zg.current.startPublishingStream(
-        streamID,
-        localStream.current ?? stream,
-        {
-          videoCodec,
-        }
-      );
+      zg.current.startPublishingStream(streamID, localStream ?? stream, {
+        videoCodec,
+      });
 
       if (!publishVideoRef.current) throw new Error('publishVideoRef is null');
-      publishVideoRef.current.srcObject = localStream.current;
+      publishVideoRef.current.srcObject = localStream;
 
       return true;
     } catch (e) {
@@ -287,16 +286,15 @@ const Server = ({ type = 'server' }: Props) => {
 
   // 流
   // Step 5: play stream
-  // 拉流信息
-  const remoteStream = useRef<MediaStream | null>(null);
+  // 是否开始拉流
+  const [isPlayingStream, setIsPlayingStream] = useState(false);
   // 远端摄像头 video ref
   const playVideoRef = useRef<HTMLVideoElement>(null);
   async function playStream(streamID: string, options: ZegoWebPlayOption = {}) {
     try {
-      const stream = await zg.current.startPlayingStream(streamID, options);
-      remoteStream.current = stream;
+      remoteStream = await zg.current.startPlayingStream(streamID, options);
       if (!playVideoRef.current) throw new Error('playVideoRef is null');
-      playVideoRef.current.srcObject = remoteStream.current;
+      playVideoRef.current.srcObject = remoteStream;
       return true;
     } catch (e) {
       console.error(e);
@@ -311,20 +309,25 @@ const Server = ({ type = 'server' }: Props) => {
   // 设备权限检测时加载状态
   const [loading, setLoading] = useState(false);
 
+  // 开始视频通话按钮
   const handleVideo = async () => {
     if (!isOnline) return;
     setLoading(true);
     setShowVideo(true);
     const result = await checkSystemRequirements();
     setSystemRequireStatus(result);
-
     setLoading(false);
+
+    // 开始推流
+    setIsPublishingStream(true);
+    // 开始拉流
+    setIsPlayingStream(true);
   };
 
   // 执行推流
   useEffect(() => {
     if (!systemRequireStatus) return;
-    if (publishStatus === 'NO_PUBLISH') {
+    if (isPublishingStream) {
       publishStream(publishInfoStreamID, {
         camera: {
           audioInput: device.microphoneDevicesVal,
@@ -334,7 +337,7 @@ const Server = ({ type = 'server' }: Props) => {
         },
       });
     }
-    if (playInfoStreamID) {
+    if (isPlayingStream && playInfoStreamID) {
       playStream(playInfoStreamID, {
         video: deviceStatus.camera,
         audio: deviceStatus.microphone,
@@ -342,7 +345,25 @@ const Server = ({ type = 'server' }: Props) => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemRequireStatus, publishStatus, playInfoStreamID]);
+  }, [
+    systemRequireStatus,
+    isPublishingStream,
+    isPlayingStream,
+    playInfoStreamID,
+  ]);
+
+  const hangUp = () => {
+    if (publishStatus === 'PUBLISHING') {
+      zg.current.stopPublishingStream(publishInfoStreamID);
+      setIsPublishingStream(false);
+    }
+    if (playStatus === 'PLAYING' && playInfoStreamID) {
+      zg.current.stopPlayingStream(playInfoStreamID);
+      setPlayInfoStreamID('');
+      setIsPlayingStream(false);
+    }
+    setShowVideo(false);
+  };
 
   return (
     <>
@@ -472,7 +493,6 @@ const Server = ({ type = 'server' }: Props) => {
               className={cn(
                 'absolute hidden',
                 'group-hover:flex',
-                isPublishing || '!hidden',
                 'transition-all',
                 'h-[100px] w-full',
                 'items-center justify-evenly',
@@ -480,8 +500,8 @@ const Server = ({ type = 'server' }: Props) => {
                 'bg-opacity-50 bg-gray-300'
               )}
             >
-              <div className="cursor-pointer">
-                <HandOff className="w-12 h-12" />
+              <div className="cursor-pointer" onClick={hangUp}>
+                <HangUp className="w-12 h-12" />
               </div>
             </div>
           </div>
