@@ -93,17 +93,19 @@ const Server = ({ type = 'server' }: Props) => {
   }, [roomState]);
   // 拉流 ID
   const [playInfoStreamID, setPlayInfoStreamID] = useState<string | null>(null);
-  const publishInfoStreamIDValid = useMemo(
-    () => ({
-      PUBLISHING: (streamID: string) => setPublishInfoStreamID(streamID),
-      NO_PUBLISH: () => setPublishInfoStreamID(''),
-      PUBLISH_REQUESTING: () => setPublishInfoStreamID(''),
-      NO_PLAY: () => setPublishInfoStreamID(''),
-      PLAYING: (streamID: string) => setPublishInfoStreamID(streamID),
-      PLAY_REQUESTING: () => setPublishInfoStreamID(''),
-    }),
-    []
+
+  // 推流状态
+  const [publishStatus, setPublishStatus] = useState<
+    'PUBLISHING' | 'NO_PUBLISH' | 'PUBLISH_REQUESTING'
+  >('NO_PUBLISH');
+  const isPublishing = useMemo(
+    () => publishStatus === 'PUBLISHING',
+    [publishStatus]
   );
+  // 拉流状态
+  const [playStatus, setPlayStatus] = useState<
+    'NO_PLAY' | 'PLAY_REQUESTING' | 'PLAYING'
+  >('NO_PLAY');
 
   // 对方是否在线
   const [isOnline, setIsOnline] = useState(false);
@@ -120,15 +122,17 @@ const Server = ({ type = 'server' }: Props) => {
       setIsOnline(true);
     }
   });
-  zg.current.on('publisherStateUpdate', ({ state, streamID }) =>
-    publishInfoStreamIDValid[state](streamID)
-  );
+  zg.current.on('publisherStateUpdate', ({ state, streamID }) => {
+    setPublishStatus(state);
+  });
   zg.current.on('playerStateUpdate', ({ state, streamID }) => {
-    publishInfoStreamIDValid[state](streamID);
+    setPlayStatus(state);
   });
   zg.current.on('roomStreamUpdate', (roomID, updateType, steamList) => {
     if (updateType === 'ADD') {
       setPlayInfoStreamID(steamList[0].streamID);
+    }
+    if (updateType === 'DELETE') {
     }
   });
 
@@ -255,7 +259,6 @@ const Server = ({ type = 'server' }: Props) => {
   // 本机摄像头 video ref
   const publishVideoRef = useRef<HTMLVideoElement>(null);
   // 是否已经开始推流
-  const [isPublishing, setIsPublishing] = useState(false);
   async function publishStream(
     streamID: string,
     config: ZegoLocalStreamConfig
@@ -274,7 +277,6 @@ const Server = ({ type = 'server' }: Props) => {
 
       if (!publishVideoRef.current) throw new Error('publishVideoRef is null');
       publishVideoRef.current.srcObject = localStream.current;
-      setIsPublishing(true);
 
       return true;
     } catch (e) {
@@ -322,7 +324,7 @@ const Server = ({ type = 'server' }: Props) => {
   // 执行推流
   useEffect(() => {
     if (!systemRequireStatus) return;
-    if (!isPublishing) {
+    if (publishStatus === 'NO_PUBLISH') {
       publishStream(publishInfoStreamID, {
         camera: {
           audioInput: device.microphoneDevicesVal,
@@ -340,7 +342,7 @@ const Server = ({ type = 'server' }: Props) => {
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [systemRequireStatus, isPublishing, playInfoStreamID]);
+  }, [systemRequireStatus, publishStatus, playInfoStreamID]);
 
   return (
     <>
