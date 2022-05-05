@@ -32,35 +32,19 @@ const Server = ({ type = 'server' }: Props) => {
   });
   const validType = useMemo(
     () => ({
-      // server: () =>
-      //   setRoomState((d) => {
-      //     d.userId = process.env.REACT_APP_userId1 ?? '';
-      //     d.roomId = process.env.REACT_APP_roomId1 ?? '';
-      //     d.userName = process.env.REACT_APP_userName1 ?? '';
-      //     d.token = process.env.REACT_APP_token1 ?? '';
-      //   }),
-      // client: () =>
-      //   setRoomState((d) => {
-      //     d.userId = process.env.REACT_APP_userId2 ?? '';
-      //     d.roomId = process.env.REACT_APP_roomId2 ?? '';
-      //     d.userName = process.env.REACT_APP_userName2 ?? '';
-      //     d.token = process.env.REACT_APP_token2 ?? '';
-      //   }),
       server: () =>
         setRoomState((d) => {
-          d.userId = 'xfy';
-          d.roomId = '1';
-          d.userName = 'xfy';
-          d.token =
-            '03AAAAAGJ0iTEAEG85MTV4Y2F2MnBvb2ZodWgAoLqadS2NH8h7fSh5rxU0b3HhuVOJshc8rZBuiwgrs5I/LLWsAV1szOkH1BKtDIMgk2exkWRwx2Zk4ki7ZeJBIHQUMxNlNtN71UVPvJNwZ0OT/ZXiNfp1IOTaBRhuonEF7FNc3XcyFCjxRUg46pi8kqpqmACWut5wJC61EdwUM8HHtZr6FMvLDGmVsle/S2bVFBnHdiFKXExdsu32D1rAsJ0=';
+          d.userId = process.env.REACT_APP_userId1 ?? '';
+          d.roomId = process.env.REACT_APP_roomId1 ?? '';
+          d.userName = process.env.REACT_APP_userName1 ?? '';
+          d.token = process.env.REACT_APP_token1 ?? '';
         }),
       client: () =>
         setRoomState((d) => {
-          d.userId = 'dfy';
-          d.roomId = '1';
-          d.userName = 'dfy';
-          d.token =
-            '03AAAAAGJ0iVgAEDM5c2F5ZDQxemptYjI5ZXMAoBleXII3TpuzLpODXpV/oQES7ruLW2u7SOHipzorOmUesiCUStjndxROXXYtUw8hWHUntzVTWelm7PiyR1YIx4EkmjHdI+xJFH8MyuAQc6JI8tXpo4R8hnacg2TKSAz7Mh+G/0Zc5quQDd8VWfehaXDY07cKTcnLHwREC1iNdTD787abWbXPzmYxDY3zqoNuYBnzH5CVDKYXcSiq6zmAVN4=';
+          d.userId = process.env.REACT_APP_userId2 ?? '';
+          d.roomId = process.env.REACT_APP_roomId2 ?? '';
+          d.userName = process.env.REACT_APP_userName2 ?? '';
+          d.token = process.env.REACT_APP_token2 ?? '';
         }),
     }),
     [setRoomState]

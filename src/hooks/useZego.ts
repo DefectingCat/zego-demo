@@ -63,6 +63,9 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     'NO_PLAY' | 'PLAY_REQUESTING' | 'PLAYING'
   >('NO_PLAY');
 
+  /**
+   * 登录到房间方法
+   */
   const loginRoom = useCallback(
     async (roomId: string, userId: string, userName: string, token: string) => {
       try {
@@ -82,6 +85,10 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     []
   );
 
+  /**
+   * 挂断视频
+   * 并结束推/拉流，销毁 Zego 引擎
+   */
   const hangUp = useCallback(() => {
     localStream && zg.current?.destroyStream(localStream);
     localStream = null;
@@ -99,6 +106,10 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     zg.current = undefined;
   }, [playInfoStreamID, publishInfoStreamID]);
 
+  /**
+   * 创建 Zego 引擎
+   * 监听房间事件 - 登录到房间
+   */
   const createZegoExpressEngineOption = useCallback(
     async (appID: number, server: string) => {
       zg.current = new ZegoExpressEngine(appID, server);
@@ -161,7 +172,9 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     microphoneDevicesVal: '',
     cameraDevicesVal: '',
   });
-  // 枚举设备
+  /**
+   * 枚举音/视频设备
+   */
   const enumerateDevices = useCallback(async () => {
     const deviceInfo = await zg.current?.enumDevices();
     const audioDeviceList =
@@ -192,7 +205,6 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     });
   }, [setDevice]);
 
-  // Step 2: Check system requirements
   // 设备权限状态
   const [deviceStatus, setDeviceStatus] = useState<{
     [key: string]: boolean;
@@ -202,6 +214,9 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     camera: false,
     microphone: false,
   });
+  /**
+   * 检查当前设备权限状态并枚举设备
+   */
   const checkSystemRequirements = useCallback(async () => {
     console.warn('sdk version is', zg.current?.getVersion());
     try {
@@ -240,7 +255,6 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     }
   }, [enumerateDevices]);
 
-  // Step 4: publish stream
   // 流编码
   const videoCodec =
     localStorage.getItem('VideoCodec') === 'H.264' ? 'H264' : 'VP8';
@@ -249,6 +263,10 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
   const publishVideoRef = useRef<HTMLVideoElement>(null);
   // 是否开始推流
   const [isPublishingStream, setIsPublishingStream] = useState(false);
+  /**
+   * 开始推流方法
+   * 将本地摄像头的视频流推送到服务器，同时输出到 video 标签
+   */
   const publishStream = useCallback(
     async (streamID: string, config: ZegoLocalStreamConfig) => {
       try {
@@ -273,12 +291,14 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     [videoCodec]
   );
 
-  // 拉流
-  // Step 5: play stream
   // 是否开始拉流
   const [isPlayingStream, setIsPlayingStream] = useState(false);
   // 远端摄像头 video ref
   const playVideoRef = useRef<HTMLVideoElement>(null);
+  /**
+   * 开始拉流方法
+   * 将远程流拉取到本地，同时设置到 video 标签
+   */
   const playStream = useCallback(
     async (streamID: string, options: ZegoWebPlayOption = {}) => {
       try {
@@ -302,7 +322,10 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
   // 设备权限检测时加载状态
   const [loading, setLoading] = useState(false);
 
-  // 开始视频通话按钮
+  /**
+   * 开始视频通话按钮
+   * 判断是否支持视频通话，如果支持，则开始推流，同时开始拉流
+   */
   const handleVideo = useCallback(async () => {
     setLoading(true);
     setShowVideo(true);
@@ -318,7 +341,10 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     setIsPlayingStream(true);
   }, [appID, checkSystemRequirements, createZegoExpressEngineOption, server]);
 
-  // 执行推流
+  /**
+   * 检查设备权限和枚举设备时需要设置状态
+   * 所有此处需要监听是否开始推/拉流
+   */
   useEffect(() => {
     if (!systemRequireStatus) return;
     if (isPublishingStream) {
