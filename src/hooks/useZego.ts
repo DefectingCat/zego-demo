@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useImmer } from 'use-immer';
 import { ZegoExpressEngine } from 'zego-express-engine-webrtc';
 import {
@@ -63,44 +63,136 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     'NO_PLAY' | 'PLAY_REQUESTING' | 'PLAYING'
   >('NO_PLAY');
 
-  const createZegoExpressEngineOption = async () => {
-    zg.current = new ZegoExpressEngine(appID, server);
-
-    // Init engine event
-    zg.current.on('roomOnlineUserCountUpdate', (roomID, count) => {
-      // console.debug(count);
-    });
-    zg.current.on('roomStateUpdate', (roomID, state) => {
-      connectStatusValid[state]();
-    });
-    // // 监听对方进入房间
-    // zg.current.on('roomUserUpdate', (roomID, updateType, userList) => {
-    //   if (userList.length > 0) {
-    //     setIsOnline(true);
-    //   }
-    // });
-    zg.current.on('publisherStateUpdate', ({ state, streamID }) => {
-      setPublishStatus(state);
-    });
-    zg.current.on('playerStateUpdate', ({ state, streamID }) => {
-      setPlayStatus(state);
-    });
-    zg.current.on('roomStreamUpdate', (roomID, updateType, steamList) => {
-      if (updateType === 'ADD') {
-        setPlayInfoStreamID(steamList[0].streamID);
+  const loginRoom = useCallback(
+    async (roomId: string, userId: string, userName: string, token: string) => {
+      try {
+        await zg.current?.loginRoom(
+          roomId,
+          token,
+          {
+            userID: userId,
+            userName,
+          },
+          { userUpdate: true }
+        );
+      } catch (e) {
+        console.error(e);
       }
-      if (updateType === 'DELETE') {
-        hangUp();
-      }
-    });
+    },
+    []
+  );
 
-    await loginRoom(
+  const hangUp = useCallback(() => {
+    localStream && zg.current?.destroyStream(localStream);
+    localStream = null;
+    zg.current?.stopPublishingStream(publishInfoStreamID);
+    setIsPublishingStream(false);
+
+    if (publishVideoRef.current) publishVideoRef.current.srcObject = null;
+    remoteStream && zg.current?.destroyStream(remoteStream);
+    remoteStream = null;
+    zg.current?.stopPlayingStream(playInfoStreamID ?? '');
+    setPlayInfoStreamID('');
+    setIsPlayingStream(false);
+
+    if (playVideoRef.current) playVideoRef.current.srcObject = null;
+    setShowVideo(false);
+
+    zg.current = undefined;
+  }, [playInfoStreamID, publishInfoStreamID]);
+
+  const createZegoExpressEngineOption = useCallback(
+    async (appID: number, server: string) => {
+      zg.current = new ZegoExpressEngine(appID, server);
+
+      // Init engine event
+      zg.current.on('roomOnlineUserCountUpdate', (roomID, count) => {
+        // console.debug(count);
+      });
+      zg.current.on('roomStateUpdate', (roomID, state) => {
+        connectStatusValid[state]();
+      });
+      // // 监听对方进入房间
+      // zg.current.on('roomUserUpdate', (roomID, updateType, userList) => {
+      //   if (userList.length > 0) {
+      //     setIsOnline(true);
+      //   }
+      // });
+      zg.current.on('publisherStateUpdate', ({ state, streamID }) => {
+        setPublishStatus(state);
+      });
+      zg.current.on('playerStateUpdate', ({ state, streamID }) => {
+        setPlayStatus(state);
+      });
+      zg.current.on('roomStreamUpdate', (roomID, updateType, steamList) => {
+        if (updateType === 'ADD') {
+          setPlayInfoStreamID(steamList[0].streamID);
+        }
+        if (updateType === 'DELETE') {
+          hangUp();
+        }
+      });
+
+      await loginRoom(
+        roomState.roomId,
+        roomState.userId,
+        roomState.userName,
+        roomState.token
+      );
+    },
+    [
+      connectStatusValid,
+      hangUp,
+      loginRoom,
       roomState.roomId,
+      roomState.token,
       roomState.userId,
       roomState.userName,
-      roomState.token
-    );
-  };
+    ]
+  );
+
+  // 设备列表
+  const [device, setDevice] = useImmer<{
+    audioDeviceList: ZegoDeviceInfo[];
+    videoDeviceList: ZegoDeviceInfo[];
+    microphoneDevicesVal: string;
+    cameraDevicesVal: string;
+  }>({
+    audioDeviceList: [],
+    videoDeviceList: [],
+    microphoneDevicesVal: '',
+    cameraDevicesVal: '',
+  });
+  // 枚举设备
+  const enumerateDevices = useCallback(async () => {
+    const deviceInfo = await zg.current?.enumDevices();
+    const audioDeviceList =
+      deviceInfo &&
+      deviceInfo.microphones.map((item, index) => {
+        if (!item.deviceName) {
+          item.deviceName = 'microphone' + index;
+        }
+        console.log('microphone: ' + item.deviceName);
+        return item;
+      });
+    audioDeviceList?.push({ deviceID: '0', deviceName: '禁止' });
+    const videoDeviceList =
+      deviceInfo &&
+      deviceInfo.cameras.map((item, index) => {
+        if (!item.deviceName) {
+          item.deviceName = 'camera' + index;
+        }
+        console.log('camera: ' + item.deviceName);
+        return item;
+      });
+    videoDeviceList?.push({ deviceID: '0', deviceName: '禁止' });
+    setDevice((d) => {
+      d.audioDeviceList = audioDeviceList ?? [];
+      d.videoDeviceList = videoDeviceList ?? [];
+      d.microphoneDevicesVal = audioDeviceList?.[0].deviceID ?? '';
+      d.cameraDevicesVal = videoDeviceList?.[0].deviceID ?? '';
+    });
+  }, [setDevice]);
 
   // Step 2: Check system requirements
   // 设备权限状态
@@ -112,7 +204,7 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     camera: false,
     microphone: false,
   });
-  async function checkSystemRequirements() {
+  const checkSystemRequirements = useCallback(async () => {
     console.warn('sdk version is', zg.current?.getVersion());
     try {
       const result = await zg.current?.checkSystemRequirements();
@@ -148,72 +240,7 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
       console.error('checkSystemRequirements', err);
       return false;
     }
-  }
-
-  // 设备列表
-  const [device, setDevice] = useImmer<{
-    audioDeviceList: ZegoDeviceInfo[];
-    videoDeviceList: ZegoDeviceInfo[];
-    microphoneDevicesVal: string;
-    cameraDevicesVal: string;
-  }>({
-    audioDeviceList: [],
-    videoDeviceList: [],
-    microphoneDevicesVal: '',
-    cameraDevicesVal: '',
-  });
-  // 枚举设备
-  async function enumerateDevices() {
-    const deviceInfo = await zg.current?.enumDevices();
-    const audioDeviceList =
-      deviceInfo &&
-      deviceInfo.microphones.map((item, index) => {
-        if (!item.deviceName) {
-          item.deviceName = 'microphone' + index;
-        }
-        console.log('microphone: ' + item.deviceName);
-        return item;
-      });
-    audioDeviceList?.push({ deviceID: '0', deviceName: '禁止' });
-    const videoDeviceList =
-      deviceInfo &&
-      deviceInfo.cameras.map((item, index) => {
-        if (!item.deviceName) {
-          item.deviceName = 'camera' + index;
-        }
-        console.log('camera: ' + item.deviceName);
-        return item;
-      });
-    videoDeviceList?.push({ deviceID: '0', deviceName: '禁止' });
-    setDevice((d) => {
-      d.audioDeviceList = audioDeviceList ?? [];
-      d.videoDeviceList = videoDeviceList ?? [];
-      d.microphoneDevicesVal = audioDeviceList?.[0].deviceID ?? '';
-      d.cameraDevicesVal = videoDeviceList?.[0].deviceID ?? '';
-    });
-  }
-
-  // Step 3: login to room
-  async function loginRoom(
-    roomId: string,
-    userId: string,
-    userName: string,
-    token: string
-  ) {
-    try {
-      await zg.current?.loginRoom(
-        roomId,
-        token,
-        {
-          userID: userId,
-          userName,
-        },
-        { userUpdate: true }
-      );
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  }, [enumerateDevices]);
 
   // Step 4: publish stream
   // 流编码
@@ -225,29 +252,30 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
   const publishVideoRef = useRef<HTMLVideoElement>(null);
   // 是否开始推流
   const [isPublishingStream, setIsPublishingStream] = useState(false);
-  async function publishStream(
-    streamID: string,
-    config: ZegoLocalStreamConfig
-  ) {
-    try {
-      const stream = await zg.current?.createStream(config);
-      localStream = stream;
+  const publishStream = useCallback(
+    async (streamID: string, config: ZegoLocalStreamConfig) => {
+      try {
+        const stream = await zg.current?.createStream(config);
+        localStream = stream;
 
-      if (!localStream) throw new Error('Create stream failed');
+        if (!localStream) throw new Error('Create stream failed');
 
-      zg.current?.startPublishingStream(streamID, localStream, {
-        videoCodec,
-      });
+        zg.current?.startPublishingStream(streamID, localStream, {
+          videoCodec,
+        });
 
-      if (!publishVideoRef.current) throw new Error('publishVideoRef is null');
-      publishVideoRef.current.srcObject = localStream;
+        if (!publishVideoRef.current)
+          throw new Error('publishVideoRef is null');
+        publishVideoRef.current.srcObject = localStream;
 
-      return true;
-    } catch (e) {
-      console.error(e);
-      return false;
-    }
-  }
+        return true;
+      } catch (e) {
+        console.error(e);
+        return false;
+      }
+    },
+    [videoCodec]
+  );
 
   // 拉流
   // Step 5: play stream
@@ -255,18 +283,21 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
   const [isPlayingStream, setIsPlayingStream] = useState(false);
   // 远端摄像头 video ref
   const playVideoRef = useRef<HTMLVideoElement>(null);
-  async function playStream(streamID: string, options: ZegoWebPlayOption = {}) {
-    try {
-      remoteStream = await zg.current?.startPlayingStream(streamID, options);
-      if (!playVideoRef.current) throw new Error('playVideoRef is null');
-      if (!remoteStream) throw new Error('Create stream failed');
-      playVideoRef.current.srcObject = remoteStream;
-      return true;
-    } catch (e) {
-      console.error(e);
-      return false;
-    }
-  }
+  const playStream = useCallback(
+    async (streamID: string, options: ZegoWebPlayOption = {}) => {
+      try {
+        remoteStream = await zg.current?.startPlayingStream(streamID, options);
+        if (!playVideoRef.current) throw new Error('playVideoRef is null');
+        if (!remoteStream) throw new Error('Create stream failed');
+        playVideoRef.current.srcObject = remoteStream;
+        return true;
+      } catch (e) {
+        console.error(e);
+        return false;
+      }
+    },
+    []
+  );
 
   // 设备权限状态
   const [systemRequireStatus, setSystemRequireStatus] = useState(false);
@@ -276,11 +307,11 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
   const [loading, setLoading] = useState(false);
 
   // 开始视频通话按钮
-  const handleVideo = async () => {
+  const handleVideo = useCallback(async () => {
     setLoading(true);
     setShowVideo(true);
 
-    await createZegoExpressEngineOption();
+    await createZegoExpressEngineOption(appID, server);
     const result = await checkSystemRequirements();
     setSystemRequireStatus(result);
     setLoading(false);
@@ -289,7 +320,7 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     setIsPublishingStream(true);
     // 开始拉流
     setIsPlayingStream(true);
-  };
+  }, [appID, checkSystemRequirements, createZegoExpressEngineOption, server]);
 
   // 执行推流
   useEffect(() => {
@@ -320,25 +351,6 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     playInfoStreamID,
   ]);
 
-  const hangUp = () => {
-    localStream && zg.current?.destroyStream(localStream);
-    localStream = null;
-    zg.current?.stopPublishingStream(publishInfoStreamID);
-    setIsPublishingStream(false);
-
-    if (publishVideoRef.current) publishVideoRef.current.srcObject = null;
-    remoteStream && zg.current?.destroyStream(remoteStream);
-    remoteStream = null;
-    zg.current?.stopPlayingStream(playInfoStreamID ?? '');
-    setPlayInfoStreamID('');
-    setIsPlayingStream(false);
-
-    if (playVideoRef.current) playVideoRef.current.srcObject = null;
-    setShowVideo(false);
-
-    zg.current = undefined;
-  };
-
   return {
     zg: zg.current,
     handleVideo,
@@ -349,6 +361,8 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     loading,
     deviceStatus,
     hangUp,
+    connectStatus,
+    playStatus,
   };
 };
 
