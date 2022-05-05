@@ -86,14 +86,12 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     localStream && zg.current?.destroyStream(localStream);
     localStream = null;
     zg.current?.stopPublishingStream(publishInfoStreamID);
-    setIsPublishingStream(false);
 
     if (publishVideoRef.current) publishVideoRef.current.srcObject = null;
     remoteStream && zg.current?.destroyStream(remoteStream);
     remoteStream = null;
     zg.current?.stopPlayingStream(playInfoStreamID ?? '');
     setPlayInfoStreamID('');
-    setIsPlayingStream(false);
 
     if (playVideoRef.current) playVideoRef.current.srcObject = null;
     setShowVideo(false);
@@ -248,7 +246,6 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     localStorage.getItem('VideoCodec') === 'H.264' ? 'H264' : 'VP8';
 
   // 本机摄像头 video ref
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const publishVideoRef = useRef<HTMLVideoElement>(null);
   // 是否开始推流
   const [isPublishingStream, setIsPublishingStream] = useState(false);
@@ -259,7 +256,6 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
         localStream = stream;
 
         if (!localStream) throw new Error('Create stream failed');
-
         zg.current?.startPublishingStream(streamID, localStream, {
           videoCodec,
         });
@@ -335,12 +331,14 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
           ...resolution,
         },
       });
+      setIsPublishingStream(false);
     }
     if (isPlayingStream && playInfoStreamID) {
       playStream(playInfoStreamID, {
         video: deviceStatus.camera,
         audio: deviceStatus.microphone,
       });
+      setIsPlayingStream(false);
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
