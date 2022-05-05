@@ -9469,3 +9469,8 @@ zego-express-logger@1.2.0:
   version "1.2.0"
   resolved "https://registry.npmmirror.com/zego-express-logger/-/zego-express-logger-1.2.0.tgz#fe99314bec408d73f6d84b9882e121fa53cb87f2"
   integrity sha512-wtKhEmkr7D+K9LJ8XJtCw0c/T0KjcczhQ5lc+XudFWENSHTo3Zs0bWuVAa64EbwQzTw6FuCrBcnG683sNQcS1Q==
+
+zego-zim-web@^1.2.1:
+  version "1.2.1"
+  resolved "https://registry.npmmirror.com/zego-zim-web/-/zego-zim-web-1.2.1.tgz#df203bca6b0284a011f3796ec6bcd9a4e2116fbc"
+  integrity sha512-uRPPr2fTy89EOZ5YzPbmTOnieUgFD2XUHE4252qMcD8yWbpavvVBgPGV8hSzbKyoU0sOJnLTEwvfkX7SNDk8Zw==
