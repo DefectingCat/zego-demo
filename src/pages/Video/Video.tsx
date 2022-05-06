@@ -1,5 +1,5 @@
 import cn from 'classnames';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ReactComponent as MicroPhone } from 'assets/video/microphone.svg';
 import { ReactComponent as Camera } from 'assets/video/camera.svg';
 import { ReactComponent as HangUp } from 'assets/video/hangup.svg';
@@ -7,9 +7,12 @@ import { Button, Popover } from '@nextui-org/react';
 import { useImmer } from 'use-immer';
 import Draggable from 'react-draggable';
 import useZego, { RoomState } from 'hooks/useZego';
+import useZim from 'hooks/useZim';
+import MessageCard from 'components/MessageCard';
 
 const appID = 1237665297;
 const server = 'wss://webliveroom1237665297-api.imzego.com/ws';
+const serverSecret = '8f6359ee682a3ca977dd3b001e97faec';
 
 const deviceValid: {
   [key: string]: string;
@@ -55,6 +58,7 @@ const Server = ({ type = 'server' }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setRoomState]);
 
+  // 音/视频
   const {
     handleVideo,
     showVideo,
@@ -65,6 +69,34 @@ const Server = ({ type = 'server' }: Props) => {
     deviceStatus,
     hangUp,
   } = useZego(appID, server, roomState);
+
+  // 即时通讯
+  const { sendMsg, toSendMsg } = useZim(
+    appID,
+    serverSecret,
+    roomState,
+    type === 'server'
+  );
+  // 输入框内容
+  const [msg, setMsg] = useState('');
+
+  const handleSend = () => {
+    toSendMsg(msg);
+    setMsg('');
+  };
+  const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (
+    e
+  ) => {
+    if (e.key === 'Enter') e.preventDefault();
+    if (e.key === 'Enter' && e.ctrlKey) {
+      setMsg(msg + '\n');
+    }
+  };
+  const handleKey: React.KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+    if (e.key === 'Enter' && !e.ctrlKey) {
+      handleSend();
+    }
+  };
 
   return (
     <>
@@ -103,7 +135,18 @@ const Server = ({ type = 'server' }: Props) => {
         <div className="h-[1px] bg-gray-300"></div>
 
         {/* 聊天内容框 */}
-        <div className="h-[400px]"></div>
+        <div className="h-[400px] overflow-y-auto">
+          {sendMsg.map((m) => {
+            return (
+              <MessageCard
+                key={m.timestamp}
+                username={roomState.userName}
+                msg={m.message}
+                isSelf={m.userID === roomState.userId}
+              />
+            );
+          })}
+        </div>
 
         <div className="h-[1px] bg-gray-300"></div>
         {/* 聊天工具栏 */}
@@ -130,10 +173,14 @@ const Server = ({ type = 'server' }: Props) => {
             name=""
             id=""
             className="w-full h-full resize-none"
+            onChange={(e) => setMsg(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleKey}
+            value={msg}
           ></textarea>
         </div>
         <div className="flex justify-end">
-          <Button>发送</Button>
+          <Button onClick={handleSend}>发送</Button>
         </div>
       </div>
 

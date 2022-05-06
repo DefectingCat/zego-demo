@@ -336,9 +336,9 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     setLoading(false);
 
     // 开始推流
-    setIsPublishingStream(true);
+    setIsPublishingStream(result);
     // 开始拉流
-    setIsPlayingStream(true);
+    setIsPlayingStream(result);
   }, [appID, checkSystemRequirements, createZegoExpressEngineOption, server]);
 
   /**
