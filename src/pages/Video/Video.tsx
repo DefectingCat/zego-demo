@@ -1,5 +1,5 @@
 import cn from 'classnames';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ReactComponent as MicroPhone } from 'assets/video/microphone.svg';
 import { ReactComponent as Camera } from 'assets/video/camera.svg';
 import { ReactComponent as HangUp } from 'assets/video/hangup.svg';
@@ -8,6 +8,7 @@ import { useImmer } from 'use-immer';
 import Draggable from 'react-draggable';
 import useZego, { RoomState } from 'hooks/useZego';
 import MessageCard from 'components/MessageCard';
+import Scrollbars from 'react-custom-scrollbars-2';
 
 const appID = 1237665297;
 const server = 'wss://webliveroom1237665297-api.imzego.com/ws';
@@ -72,6 +73,11 @@ const Server = ({ type = 'server' }: Props) => {
     receivedMsg,
   } = useZego(appID, server, roomState);
 
+  const wrapper = useRef<Scrollbars>(null);
+  useEffect(() => {
+    wrapper.current?.scrollToBottom();
+  }, [receivedMsg.length]);
+
   // 输入框内容
   const [msg, setMsg] = useState('');
 
@@ -126,15 +132,25 @@ const Server = ({ type = 'server' }: Props) => {
         <div className="h-[1px] bg-gray-300"></div>
 
         {/* 聊天内容框 */}
-        <div className="h-[400px] overflow-y-auto">
-          {receivedMsg.map((msg) => (
-            <MessageCard
-              key={msg.messageID}
-              username={roomState.userName}
-              msg={msg.message}
-              isSelf={msg.fromUser.userID === roomState.userId}
-            />
-          ))}
+        <div className="h-[400px] overflow-hidden">
+          <Scrollbars
+            autoHide
+            autoHideTimeout={1000}
+            autoHideDuration={200}
+            ref={wrapper}
+            className="h-[400px] "
+          >
+            <div className="px-3">
+              {receivedMsg.map((msg) => (
+                <MessageCard
+                  key={msg.messageID}
+                  username={roomState.userName}
+                  msg={msg.message}
+                  isSelf={msg.fromUser.userID === roomState.userId}
+                />
+              ))}
+            </div>
+          </Scrollbars>
         </div>
 
         <div className="h-[1px] bg-gray-300"></div>

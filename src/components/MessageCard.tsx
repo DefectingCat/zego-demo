@@ -12,7 +12,7 @@ const MessageCard = ({ username, msg, isSelf }: Props) => {
     <>
       <div
         className={classNames(
-          'flex my-4 items-center',
+          'flex my-4',
           'justify-end',
           isSelf || 'flex-row-reverse'
         )}
