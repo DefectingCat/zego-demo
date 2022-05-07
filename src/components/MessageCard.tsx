@@ -13,17 +13,19 @@ const MessageCard = ({ username, msg, isSelf }: Props) => {
       <div
         className={classNames(
           'flex my-4 items-center',
-          isSelf && 'justify-end'
+          'justify-end',
+          isSelf || 'flex-row-reverse'
         )}
       >
-        <div>
-          {!!isSelf || <div>{username}</div>}
+        <div className="mx-3">
+          {!!isSelf || <div className="text-sm">{username}</div>}
           <div
             className={classNames(
               'whitespace-pre',
-              'py-2 px-3 text-white',
-              'rounded-lg mr-3',
-              isSelf && 'bg-blue-500'
+              'py-2 px-3',
+              'rounded-lg',
+              isSelf ? 'bg-blue-500' : 'bg-gray-200',
+              isSelf && 'text-white'
             )}
           >
             {msg}

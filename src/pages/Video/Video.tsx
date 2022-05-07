@@ -69,6 +69,7 @@ const Server = ({ type = 'server' }: Props) => {
     hangUp,
     isOnline,
     sendBroadcastMessage,
+    receivedMsg,
   } = useZego(appID, server, roomState);
 
   // 输入框内容
@@ -130,16 +131,14 @@ const Server = ({ type = 'server' }: Props) => {
 
         {/* 聊天内容框 */}
         <div className="h-[400px] overflow-y-auto">
-          {/* {sendMsg.map((m) => {
-            return (
-              <MessageCard
-                key={m.timestamp}
-                username={roomState.userName}
-                msg={m.message}
-                isSelf={m.userID === roomState.userId}
-              />
-            );
-          })} */}
+          {receivedMsg.map((msg) => (
+            <MessageCard
+              key={msg.messageID}
+              username={roomState.userName}
+              msg={msg.message}
+              isSelf={msg.fromUser.userID === roomState.userId}
+            />
+          ))}
         </div>
 
         <div className="h-[1px] bg-gray-300"></div>

@@ -148,7 +148,11 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
       // 房间实时消息
       zg?.on('IMRecvBroadcastMessage', (roomID, chatData) => {
         setReceivedMsg((d) => {
-          chatData.map((m) => (d[m.messageID] = m));
+          chatData.forEach((msg) => {
+            const duplicateMsg = d.find((m) => m.messageID === msg.messageID);
+            if (duplicateMsg) return;
+            d.push(msg);
+          });
         });
       });
 
@@ -159,6 +163,7 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
         roomState.token
       );
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       connectStatusValid,
       hangUp,
@@ -392,16 +397,25 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     createZegoExpressEngineOption(appID, server);
   }, [appID, createZegoExpressEngineOption, roomState, server]);
 
-  // 已经发送的消息
-  const [sendedMsg, setSendedMsg] = useState<string[]>([]);
   // 收到的消息
-  const [receivedMsg, setReceivedMsg] = useImmer<{
-    [key: ZegoBroadcastMessageInfo['messageID']]: ZegoBroadcastMessageInfo;
-  }>({});
+  const [receivedMsg, setReceivedMsg] = useImmer<ZegoBroadcastMessageInfo[]>(
+    []
+  );
   const sendBroadcastMessage = async (msg: string) => {
     try {
       const isSent = await zg?.sendBroadcastMessage(roomState.roomId, msg);
-      setSendedMsg([...sendedMsg, msg]);
+      const sendedMsg: ZegoBroadcastMessageInfo = {
+        fromUser: {
+          userID: roomState.userId,
+          userName: roomState.userName,
+        },
+        message: msg,
+        sendTime: new Date().getTime(),
+        messageID: new Date().getTime(),
+      };
+      setReceivedMsg((d) => {
+        d.push(sendedMsg);
+      });
       console.log('>>> sendMsg success, ', isSent);
     } catch (error) {
       console.log('>>> sendMsg, error: ', error);
@@ -420,6 +434,7 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     isOnline,
 
     sendBroadcastMessage,
+    receivedMsg,
 
     connectStatus,
     playStatus,
