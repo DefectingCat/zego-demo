@@ -1,5 +1,5 @@
 import { AES, enc } from 'crypto-js';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useImmer } from 'use-immer';
 import { ZIM, ZIMMessage } from 'zego-zim-web';
 import { RoomState } from './useZego';
