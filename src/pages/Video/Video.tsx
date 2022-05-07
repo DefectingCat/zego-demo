@@ -83,14 +83,10 @@ const Server = ({ type = 'server' }: Props) => {
     e
   ) => {
     if (e.key === 'Enter') e.preventDefault();
-    if (e.key === 'Enter' && e.ctrlKey) {
-      setMsg(msg + '\n');
-    }
+    if (e.key === 'Enter' && e.ctrlKey) setMsg(msg + '\n');
   };
   const handleKey: React.KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
-    if (e.key === 'Enter' && !e.ctrlKey) {
-      handleSend();
-    }
+    if (e.key === 'Enter' && !e.ctrlKey) handleSend();
   };
 
   return (

@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useImmer } from 'use-immer';
 import { ZegoExpressEngine } from 'zego-express-engine-webrtc';
-import {
-  ZegoDeviceInfo,
-  ZegoLocalStreamConfig,
-  ZegoWebPlayOption,
-} from 'zego-express-engine-webrtc/sdk/code/zh/ZegoExpressEntity.web';
 import { ZegoBroadcastMessageInfo } from 'zego-express-engine-webrtm/sdk/code/zh/ZegoExpressEntity';
+import useDevices from './useDevices';
+import useStream from './useStream';
 
 export type RoomState = {
   roomId: string;
@@ -20,8 +17,6 @@ export const isMobile: boolean =
     navigator.userAgent
   );
 
-let localStream: MediaStream | null | undefined = null;
-let remoteStream: MediaStream | null | undefined = null;
 const resolution = {
   width: isMobile ? 360 : 640,
   height: isMobile ? 640 : 480,
@@ -89,246 +84,21 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     []
   );
 
-  /**
-   * 挂断视频
-   * 并结束推/拉流，销毁 Zego 引擎
-   */
-  const hangUp = useCallback(() => {
-    localStream && zg?.destroyStream(localStream);
-    localStream = null;
-    zg?.stopPublishingStream(publishInfoStreamID);
+  // 检测设备
+  const { device, deviceStatus, checkSystemRequirements } = useDevices(zg);
 
-    if (publishVideoRef.current) publishVideoRef.current.srcObject = null;
-    remoteStream && zg?.destroyStream(remoteStream);
-    remoteStream = null;
-    zg?.stopPlayingStream(playInfoStreamID ?? '');
-    setPlayInfoStreamID('');
-
-    if (playVideoRef.current) playVideoRef.current.srcObject = null;
-    setShowVideo(false);
-  }, [playInfoStreamID, publishInfoStreamID]);
-
-  // 对方是否在线
-  const [isOnline, setIsOnline] = useState(false);
-  /**
-   * 监听房间事件 - 登录到房间
-   */
-  const createZegoExpressEngineOption = useCallback(
-    async (appID: number, server: string) => {
-      zg?.on('IMRecvBroadcastMessage', () => {});
-
-      // Init engine event
-      zg?.on('roomOnlineUserCountUpdate', (roomID, count) => {
-        // console.debug(count);
-      });
-      zg?.on('roomStateUpdate', (roomID, state) => {
-        connectStatusValid[state]();
-      });
-      // // 监听对方进入房间
-      zg?.on('roomUserUpdate', (roomID, updateType, userList) => {
-        if (userList.length > 0) {
-          setIsOnline(true);
-        }
-      });
-      zg?.on('publisherStateUpdate', ({ state, streamID }) => {
-        setPublishStatus(state);
-      });
-      zg?.on('playerStateUpdate', ({ state, streamID }) => {
-        setPlayStatus(state);
-      });
-      zg?.on('roomStreamUpdate', (roomID, updateType, steamList) => {
-        if (updateType === 'ADD') {
-          setPlayInfoStreamID(steamList[0].streamID);
-        }
-        if (updateType === 'DELETE') {
-          hangUp();
-        }
-      });
-
-      // 房间实时消息
-      zg?.on('IMRecvBroadcastMessage', (roomID, chatData) => {
-        setReceivedMsg((d) => {
-          chatData.forEach((msg) => {
-            const duplicateMsg = d.find((m) => m.messageID === msg.messageID);
-            if (duplicateMsg) return;
-            d.push(msg);
-          });
-        });
-      });
-
-      await loginRoom(
-        roomState.roomId,
-        roomState.userId,
-        roomState.userName,
-        roomState.token
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      connectStatusValid,
-      hangUp,
-      loginRoom,
-      roomState.roomId,
-      roomState.token,
-      roomState.userId,
-      roomState.userName,
-    ]
-  );
-
-  // 设备列表
-  const [device, setDevice] = useImmer<{
-    audioDeviceList: ZegoDeviceInfo[];
-    videoDeviceList: ZegoDeviceInfo[];
-    microphoneDevicesVal: string;
-    cameraDevicesVal: string;
-  }>({
-    audioDeviceList: [],
-    videoDeviceList: [],
-    microphoneDevicesVal: '',
-    cameraDevicesVal: '',
-  });
-  /**
-   * 枚举音/视频设备
-   */
-  const enumerateDevices = useCallback(async () => {
-    const deviceInfo = await zg?.enumDevices();
-    const audioDeviceList =
-      deviceInfo &&
-      deviceInfo.microphones.map((item, index) => {
-        if (!item.deviceName) {
-          item.deviceName = 'microphone' + index;
-        }
-        console.log('microphone: ' + item.deviceName);
-        return item;
-      });
-    audioDeviceList?.push({ deviceID: '0', deviceName: '禁止' });
-    const videoDeviceList =
-      deviceInfo &&
-      deviceInfo.cameras.map((item, index) => {
-        if (!item.deviceName) {
-          item.deviceName = 'camera' + index;
-        }
-        console.log('camera: ' + item.deviceName);
-        return item;
-      });
-    videoDeviceList?.push({ deviceID: '0', deviceName: '禁止' });
-    setDevice((d) => {
-      d.audioDeviceList = audioDeviceList ?? [];
-      d.videoDeviceList = videoDeviceList ?? [];
-      d.microphoneDevicesVal = audioDeviceList?.[0].deviceID ?? '';
-      d.cameraDevicesVal = videoDeviceList?.[0].deviceID ?? '';
-    });
-  }, [setDevice]);
-
-  // 设备权限状态
-  const [deviceStatus, setDeviceStatus] = useState<{
-    [key: string]: boolean;
-    camera: boolean;
-    microphone: boolean;
-  }>({
-    camera: false,
-    microphone: false,
-  });
-  /**
-   * 检查当前设备权限状态并枚举设备
-   */
-  const checkSystemRequirements = useCallback(async () => {
-    console.warn('sdk version is', zg?.getVersion());
-    try {
-      const result = await zg?.checkSystemRequirements();
-
-      console.warn('checkSystemRequirements ', result);
-
-      if (!result?.webRTC) {
-        console.error('browser is not support webrtc!!');
-        return false;
-      } else if (!result.videoCodec?.H264 && !result.videoCodec?.VP8) {
-        console.error('browser is not support H264 and VP8');
-        return false;
-      } else if (!result.camera && !result.microphone) {
-        console.error('camera and microphones not allowed to use');
-        setDeviceStatus({
-          camera: false,
-          microphone: false,
-        });
-        return false;
-      } else if (result.videoCodec.VP8) {
-        if (!result.screenSharing)
-          console.warn('browser is not support screenSharing');
-      } else {
-        console.log('不支持VP8，请前往混流转码测试');
-      }
-      setDeviceStatus({
-        camera: true,
-        microphone: true,
-      });
-      await enumerateDevices();
-      return true;
-    } catch (err) {
-      console.error('checkSystemRequirements', err);
-      return false;
-    }
-  }, [enumerateDevices]);
-
-  // 流编码
-  const videoCodec =
-    localStorage.getItem('VideoCodec') === 'H.264' ? 'H264' : 'VP8';
-
-  // 本机摄像头 video ref
-  const publishVideoRef = useRef<HTMLVideoElement>(null);
-  // 是否开始推流
-  const [isPublishingStream, setIsPublishingStream] = useState(false);
-  /**
-   * 开始推流方法
-   * 将本地摄像头的视频流推送到服务器，同时输出到 video 标签
-   */
-  const publishStream = useCallback(
-    async (streamID: string, config: ZegoLocalStreamConfig) => {
-      try {
-        const stream = await zg?.createStream(config);
-        localStream = stream;
-
-        if (!localStream) throw new Error('Create stream failed');
-        zg?.startPublishingStream(streamID, localStream, {
-          videoCodec,
-        });
-
-        if (!publishVideoRef.current)
-          throw new Error('publishVideoRef is null');
-        publishVideoRef.current.srcObject = localStream;
-
-        return true;
-      } catch (e) {
-        console.error(e);
-        return false;
-      }
-    },
-    [videoCodec]
-  );
-
-  // 是否开始拉流
-  const [isPlayingStream, setIsPlayingStream] = useState(false);
-  // 远端摄像头 video ref
-  const playVideoRef = useRef<HTMLVideoElement>(null);
-  /**
-   * 开始拉流方法
-   * 将远程流拉取到本地，同时设置到 video 标签
-   */
-  const playStream = useCallback(
-    async (streamID: string, options: ZegoWebPlayOption = {}) => {
-      try {
-        remoteStream = await zg?.startPlayingStream(streamID, options);
-        if (!playVideoRef.current) throw new Error('playVideoRef is null');
-        if (!remoteStream) throw new Error('Create stream failed');
-        playVideoRef.current.srcObject = remoteStream;
-        return true;
-      } catch (e) {
-        console.error(e);
-        return false;
-      }
-    },
-    []
-  );
+  // 创建流
+  const {
+    publishVideoRef,
+    isPublishingStream,
+    publishStream,
+    setIsPublishingStream,
+    playVideoRef,
+    isPlayingStream,
+    playStream,
+    setIsPlayingStream,
+    destroySteam,
+  } = useStream(zg);
 
   // 设备权限状态
   const [systemRequireStatus, setSystemRequireStatus] = useState(false);
@@ -336,6 +106,8 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
   const [showVideo, setShowVideo] = useState(false);
   // 设备权限检测时加载状态
   const [loading, setLoading] = useState(false);
+  // 对方是否在线
+  const [isOnline, setIsOnline] = useState(false);
 
   /**
    * 开始视频通话按钮
@@ -355,7 +127,12 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     setIsPublishingStream(result);
     // 开始拉流
     setIsPlayingStream(result);
-  }, [checkSystemRequirements, isOnline]);
+  }, [
+    checkSystemRequirements,
+    isOnline,
+    setIsPlayingStream,
+    setIsPublishingStream,
+  ]);
 
   /**
    * 检查设备权限和枚举设备时需要设置状态
@@ -391,12 +168,6 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     playInfoStreamID,
   ]);
 
-  // 创建实例并登录
-  useEffect(() => {
-    if (roomState.roomId === '') return;
-    createZegoExpressEngineOption(appID, server);
-  }, [appID, createZegoExpressEngineOption, roomState, server]);
-
   // 收到的消息
   const [receivedMsg, setReceivedMsg] = useImmer<ZegoBroadcastMessageInfo[]>(
     []
@@ -421,6 +192,81 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
       console.log('>>> sendMsg, error: ', error);
     }
   };
+
+  /**
+   * 挂断视频
+   * 并结束推/拉流，销毁 Zego 引擎
+   */
+  const hangUp = useCallback(() => {
+    destroySteam();
+
+    zg?.stopPublishingStream(publishInfoStreamID);
+    zg?.stopPlayingStream(playInfoStreamID ?? '');
+
+    setPlayInfoStreamID('');
+    setShowVideo(false);
+  }, [destroySteam, playInfoStreamID, publishInfoStreamID]);
+
+  // 创建实例并登录
+  useEffect(() => {
+    if (roomState.roomId === '') return;
+
+    loginRoom(
+      roomState.roomId,
+      roomState.userId,
+      roomState.userName,
+      roomState.token
+    );
+  }, [
+    loginRoom,
+    roomState.roomId,
+    roomState.token,
+    roomState.userId,
+    roomState.userName,
+  ]);
+
+  useEffect(() => {
+    zg?.on('IMRecvBroadcastMessage', () => {});
+
+    // Init engine event
+    zg?.on('roomOnlineUserCountUpdate', (roomID, count) => {
+      // console.debug(count);
+    });
+    zg?.on('roomStateUpdate', (roomID, state) => {
+      connectStatusValid[state]();
+    });
+    // // 监听对方进入房间
+    zg?.on('roomUserUpdate', (roomID, updateType, userList) => {
+      if (userList.length > 0) {
+        setIsOnline(true);
+      }
+    });
+    zg?.on('publisherStateUpdate', ({ state, streamID }) => {
+      setPublishStatus(state);
+    });
+    zg?.on('playerStateUpdate', ({ state, streamID }) => {
+      setPlayStatus(state);
+    });
+    zg?.on('roomStreamUpdate', (roomID, updateType, steamList) => {
+      if (updateType === 'ADD') {
+        setPlayInfoStreamID(steamList[0].streamID);
+      }
+      if (updateType === 'DELETE') {
+        hangUp();
+      }
+    });
+
+    // 房间实时消息
+    zg?.on('IMRecvBroadcastMessage', (roomID, chatData) => {
+      setReceivedMsg((d) => {
+        chatData.forEach((msg) => {
+          const duplicateMsg = d.find((m) => m.messageID === msg.messageID);
+          if (duplicateMsg) return;
+          d.push(msg);
+        });
+      });
+    });
+  }, [connectStatusValid, hangUp, setReceivedMsg]);
 
   return {
     handleVideo,
