@@ -7,12 +7,11 @@ import { Button, Popover } from '@nextui-org/react';
 import { useImmer } from 'use-immer';
 import Draggable from 'react-draggable';
 import useZego, { RoomState } from 'hooks/useZego';
-import useZim from 'hooks/useZim';
 import MessageCard from 'components/MessageCard';
 
 const appID = 1237665297;
 const server = 'wss://webliveroom1237665297-api.imzego.com/ws';
-const serverSecret = '8f6359ee682a3ca977dd3b001e97faec';
+// const serverSecret = '8f6359ee682a3ca977dd3b001e97faec';
 
 const deviceValid: {
   [key: string]: string;
@@ -68,20 +67,15 @@ const Server = ({ type = 'server' }: Props) => {
     loading,
     deviceStatus,
     hangUp,
+    isOnline,
+    sendBroadcastMessage,
   } = useZego(appID, server, roomState);
 
-  // 即时通讯
-  const { sendMsg, toSendMsg } = useZim(
-    appID,
-    serverSecret,
-    roomState,
-    type === 'server'
-  );
   // 输入框内容
   const [msg, setMsg] = useState('');
 
-  const handleSend = () => {
-    toSendMsg(msg);
+  const handleSend = async () => {
+    sendBroadcastMessage(msg);
     setMsg('');
   };
   const handleKeyDown: React.KeyboardEventHandler<HTMLTextAreaElement> = (
@@ -114,12 +108,12 @@ const Server = ({ type = 'server' }: Props) => {
             <span className="mr-2 text-2xl font-medium">
               云汇展在线工作人员
             </span>
-            {/* <span
+            <span
               className={cn(
                 'w-4 h-4 rounded-full',
                 isOnline ? 'bg-green-600' : 'bg-red-600'
               )}
-            ></span> */}
+            ></span>
           </div>
           <div
             className={cn(
@@ -136,7 +130,7 @@ const Server = ({ type = 'server' }: Props) => {
 
         {/* 聊天内容框 */}
         <div className="h-[400px] overflow-y-auto">
-          {sendMsg.map((m) => {
+          {/* {sendMsg.map((m) => {
             return (
               <MessageCard
                 key={m.timestamp}
@@ -145,7 +139,7 @@ const Server = ({ type = 'server' }: Props) => {
                 isSelf={m.userID === roomState.userId}
               />
             );
-          })}
+          })} */}
         </div>
 
         <div className="h-[1px] bg-gray-300"></div>
@@ -155,13 +149,13 @@ const Server = ({ type = 'server' }: Props) => {
             <Popover.Trigger>
               <Camera className="mr-4 cursor-pointer" onClick={handleVideo} />
             </Popover.Trigger>
-            {/* {isOnline ? (
+            {isOnline ? (
               <></>
             ) : (
               <Popover.Content>
                 <div className="p-4">对方不在线</div>
               </Popover.Content>
-            )} */}
+            )}
           </Popover>
 
           <MicroPhone className="cursor-pointer " />
