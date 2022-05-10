@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useImmer } from 'use-immer';
 import { ZegoExpressEngine } from 'zego-express-engine-webrtc';
-import { ZegoBroadcastMessageInfo } from 'zego-express-engine-webrtm/sdk/code/zh/ZegoExpressEntity';
 import useDevices from './useDevices';
+import useMessage from './useMessage';
 import useStream from './useStream';
 
 export type RoomState = {
@@ -100,6 +99,12 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     destroySteam,
   } = useStream(zg);
 
+  // 房间内消息
+  const { receivedMsg, setReceivedMsg, sendBroadcastMessage } = useMessage(
+    zg,
+    roomState
+  );
+
   // 设备权限状态
   const [systemRequireStatus, setSystemRequireStatus] = useState(false);
   // 是否显示 video 标签
@@ -167,31 +172,6 @@ const useZego = (appID: number, server: string, roomState: RoomState) => {
     isPlayingStream,
     playInfoStreamID,
   ]);
-
-  // 收到的消息
-  const [receivedMsg, setReceivedMsg] = useImmer<ZegoBroadcastMessageInfo[]>(
-    []
-  );
-  const sendBroadcastMessage = async (msg: string) => {
-    try {
-      const isSent = await zg?.sendBroadcastMessage(roomState.roomId, msg);
-      const sendedMsg: ZegoBroadcastMessageInfo = {
-        fromUser: {
-          userID: roomState.userId,
-          userName: roomState.userName,
-        },
-        message: msg,
-        sendTime: new Date().getTime(),
-        messageID: new Date().getTime(),
-      };
-      setReceivedMsg((d) => {
-        d.push(sendedMsg);
-      });
-      console.log('>>> sendMsg success, ', isSent);
-    } catch (error) {
-      console.log('>>> sendMsg, error: ', error);
-    }
-  };
 
   /**
    * 挂断视频
